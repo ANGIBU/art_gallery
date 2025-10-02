@@ -1,0 +1,59 @@
+# .gitignore
+
+# Python 파일 제외
+*.py
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# 설정 파일 제외
+config.py
+requirements.txt
+
+# 이미지 파일 제외
+static/image/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+
+# 환경 설정 제외
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE 설정 제외
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 로그 파일 제외
+*.log
+
+# 데이터베이스 제외
+*.db
+*.sqlite
+*.sqlite3
+
+# 캐시 제외
+.cache/
+*.cache
+
+# OS 파일 제외
+.DS_Store
+Thumbs.db
+
+# templates와 static/css, static/js는 추적됨
+!templates/
+!templates/**
+!static/css/
+!static/css/**
+!static/js/
+!static/js/**
