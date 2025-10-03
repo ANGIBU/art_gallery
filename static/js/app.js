@@ -27,6 +27,18 @@ const translations = {
                 name: '파티클 폭발', 
                 info: '클릭하여 파티클을 생성하고 콤보를 쌓으세요'
             },
+            'physics-sandbox': {
+                name: '물리 샌드박스',
+                info: '클릭 또는 드래그하여 도형 생성 | 우클릭: 중력 반전 | 스페이스: 폭발'
+            },
+            'synth-pad': {
+                name: '신디사이저',
+                info: '패드를 클릭하여 음을 연주하세요 | R키: 녹음/재생'
+            },
+            'fluid-paint': {
+                name: '플루이드 페인팅',
+                info: '마우스를 드래그하여 유체를 그리세요 | 스페이스: 화면 지우기'
+            },
             'tunnel-3d': { 
                 name: '3D 터널', 
                 info: '마우스를 움직여 무한 터널을 탐험하세요'
@@ -64,6 +76,18 @@ const translations = {
             'particle-system': { 
                 name: 'Particle Burst', 
                 info: 'Click to create particles and build combo'
+            },
+            'physics-sandbox': {
+                name: 'Physics Sandbox',
+                info: 'Click or drag to create shapes | Right-click: Reverse gravity | Space: Explode'
+            },
+            'synth-pad': {
+                name: 'Synthesizer',
+                info: 'Click pads to play notes | R key: Record/Play loop'
+            },
+            'fluid-paint': {
+                name: 'Fluid Paint',
+                info: 'Drag mouse to paint fluid | Space: Clear screen'
             },
             'tunnel-3d': { 
                 name: '3D Tunnel', 
@@ -103,6 +127,18 @@ const translations = {
                 name: 'パーティクル爆発', 
                 info: 'クリックで生成、コンボを積み上げる'
             },
+            'physics-sandbox': {
+                name: '物理サンドボックス',
+                info: 'クリックまたはドラッグで図形生成 | 右クリック: 重力反転 | スペース: 爆発'
+            },
+            'synth-pad': {
+                name: 'シンセサイザー',
+                info: 'パッドをクリックして音を演奏 | Rキー: 録音/再生'
+            },
+            'fluid-paint': {
+                name: '流体ペイント',
+                info: 'マウスドラッグで流体を描く | スペース: 画面クリア'
+            },
             'tunnel-3d': { 
                 name: '3Dトンネル', 
                 info: 'マウスを動かして無限トンネルを探索'
@@ -141,6 +177,18 @@ const translations = {
                 name: '粒子爆炸', 
                 info: '点击生成粒子,累积连击'
             },
+            'physics-sandbox': {
+                name: '物理沙盒',
+                info: '点击或拖动生成形状 | 右键: 重力反转 | 空格: 爆发'
+            },
+            'synth-pad': {
+                name: '合成器',
+                info: '点击音垫演奏音符 | R键: 录制/播放循环'
+            },
+            'fluid-paint': {
+                name: '流体绘画',
+                info: '拖动鼠标绘制流体 | 空格: 清空屏幕'
+            },
             'tunnel-3d': { 
                 name: '3D隧道', 
                 info: '移动鼠标探索无限隧道'
@@ -178,6 +226,18 @@ const translations = {
             'particle-system': { 
                 name: 'Explosion Particules', 
                 info: 'Cliquez pour créer, accumulez combo'
+            },
+            'physics-sandbox': {
+                name: 'Bac à Sable Physique',
+                info: 'Clic ou glisser pour formes | Clic droit: Gravité inverse | Espace: Exploser'
+            },
+            'synth-pad': {
+                name: 'Synthétiseur',
+                info: 'Cliquez pavés pour jouer notes | Touche R: Enregistrer/Jouer'
+            },
+            'fluid-paint': {
+                name: 'Peinture Fluide',
+                info: 'Glissez souris pour peindre fluide | Espace: Effacer écran'
             },
             'tunnel-3d': { 
                 name: 'Tunnel 3D', 
@@ -259,7 +319,10 @@ const App = () => {
         'particle-wave',
         'gravity-orbs', 
         'neural-network',
-        'particle-system'
+        'particle-system',
+        'physics-sandbox',
+        'synth-pad',
+        'fluid-paint'
     ];
 
     const visualSections = [
@@ -404,6 +467,15 @@ const ContentSection = ({ id, isActive, info, mouseRef, isLightMode, onComboChan
                     break;
                 case 'particle-system':
                     animator = new ParticleSystem(canvas, mouseRef, isLightMode, onComboChange);
+                    break;
+                case 'physics-sandbox':
+                    animator = new PhysicsSandbox(canvas, mouseRef, isLightMode);
+                    break;
+                case 'synth-pad':
+                    animator = new SynthPad(canvas, mouseRef, isLightMode);
+                    break;
+                case 'fluid-paint':
+                    animator = new FluidPaint(canvas, mouseRef, isLightMode);
                     break;
             }
 

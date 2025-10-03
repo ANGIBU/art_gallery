@@ -995,3 +995,663 @@ class ParticleSystem {
         window.removeEventListener('resize', this.resizeHandler);
     }
 }
+
+class PhysicsSandbox {
+    constructor(canvas, mouseRef, isLightMode) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.mouseRef = mouseRef;
+        this.isLightMode = isLightMode;
+        this.isActive = true;
+        this.engine = Matter.Engine.create();
+        this.world = this.engine.world;
+        this.engine.gravity.y = 1;
+        this.bodies = [];
+        this.mouseDown = false;
+        this.dragStart = null;
+        this.trajectoryPoints = [];
+        this.headerHeight = 150;
+        this.resize();
+        this.init();
+        
+        this.clickHandler = (e) => {
+            if (!this.mouseDown) {
+                this.dragStart = { x: e.clientX, y: e.clientY };
+                this.mouseDown = true;
+            }
+        };
+        
+        this.mouseUpHandler = (e) => {
+            if (this.mouseDown && this.dragStart) {
+                const dx = e.clientX - this.dragStart.x;
+                const dy = e.clientY - this.dragStart.y;
+                const speed = Math.sqrt(dx * dx + dy * dy);
+                
+                if (speed > 10) {
+                    this.createBody(this.dragStart.x, this.dragStart.y, dx * 0.02, dy * 0.02);
+                } else {
+                    this.createBody(e.clientX, e.clientY, 0, 0);
+                }
+                
+                this.mouseDown = false;
+                this.dragStart = null;
+                this.trajectoryPoints = [];
+            }
+        };
+        
+        this.contextMenuHandler = (e) => {
+            e.preventDefault();
+            this.engine.gravity.y *= -1;
+        };
+        
+        this.keyHandler = (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                this.explodeAll();
+            }
+        };
+        
+        this.canvas.addEventListener('mousedown', this.clickHandler);
+        this.canvas.addEventListener('mouseup', this.mouseUpHandler);
+        this.canvas.addEventListener('contextmenu', this.contextMenuHandler);
+        window.addEventListener('keydown', this.keyHandler);
+        this.resizeHandler = () => this.resize();
+        window.addEventListener('resize', this.resizeHandler);
+    }
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.init();
+    }
+
+    init() {
+        Matter.World.clear(this.world);
+        Matter.Engine.clear(this.engine);
+        this.bodies = [];
+        
+        const ground = Matter.Bodies.rectangle(
+            this.canvas.width / 2, 
+            this.canvas.height + 25, 
+            this.canvas.width, 
+            50, 
+            { isStatic: true }
+        );
+        
+        const leftWall = Matter.Bodies.rectangle(
+            -25, 
+            this.canvas.height / 2, 
+            50, 
+            this.canvas.height, 
+            { isStatic: true }
+        );
+        
+        const rightWall = Matter.Bodies.rectangle(
+            this.canvas.width + 25, 
+            this.canvas.height / 2, 
+            50, 
+            this.canvas.height, 
+            { isStatic: true }
+        );
+        
+        Matter.World.add(this.world, [ground, leftWall, rightWall]);
+    }
+
+    createBody(x, y, vx, vy) {
+        if (this.bodies.length >= 100) {
+            const oldBody = this.bodies.shift();
+            Matter.World.remove(this.world, oldBody.body);
+        }
+        
+        const shapeType = Math.floor(Math.random() * 3);
+        const size = Math.random() * 30 + 20;
+        const hue = Math.random() * 360;
+        let body;
+        
+        if (shapeType === 0) {
+            body = Matter.Bodies.circle(x, y, size, {
+                restitution: 0.8,
+                friction: 0.05,
+                density: 0.001
+            });
+        } else if (shapeType === 1) {
+            body = Matter.Bodies.rectangle(x, y, size * 2, size * 2, {
+                restitution: 0.6,
+                friction: 0.1,
+                density: 0.002
+            });
+        } else {
+            const vertices = [
+                { x: 0, y: -size },
+                { x: size, y: size },
+                { x: -size, y: size }
+            ];
+            body = Matter.Bodies.fromVertices(x, y, vertices, {
+                restitution: 0.5,
+                friction: 0.15,
+                density: 0.0015
+            });
+        }
+        
+        Matter.Body.setVelocity(body, { x: vx, y: vy });
+        
+        this.bodies.push({
+            body: body,
+            hue: hue,
+            type: shapeType,
+            brightness: 1
+        });
+        
+        Matter.World.add(this.world, body);
+    }
+
+    explodeAll() {
+        this.bodies.forEach(obj => {
+            const force = 0.05;
+            const angle = Math.random() * Math.PI * 2;
+            Matter.Body.applyForce(obj.body, obj.body.position, {
+                x: Math.cos(angle) * force,
+                y: Math.sin(angle) * force
+            });
+        });
+    }
+
+    updateTheme(isLightMode) {
+        this.isLightMode = isLightMode;
+    }
+
+    animate() {
+        if (!this.isActive) return;
+        
+        Matter.Engine.update(this.engine, 1000 / 60);
+        
+        const bg = this.isLightMode ? 'rgba(253, 251, 247, 0.15)' : 'rgba(10, 10, 10, 0.2)';
+        this.ctx.fillStyle = bg;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.bodies.forEach(obj => {
+            obj.brightness = Math.max(0.5, obj.brightness * 0.95);
+            
+            const collisions = Matter.Query.collides(obj.body, this.bodies.map(b => b.body));
+            if (collisions.length > 0) {
+                obj.brightness = 1.5;
+            }
+            
+            this.ctx.save();
+            this.ctx.translate(obj.body.position.x, obj.body.position.y);
+            this.ctx.rotate(obj.body.angle);
+            
+            if (this.isLightMode) {
+                this.ctx.fillStyle = `hsla(${obj.hue}, 70%, ${50 * obj.brightness}%, 0.8)`;
+                this.ctx.shadowColor = `hsla(${obj.hue}, 70%, 50%, 0.3)`;
+            } else {
+                this.ctx.fillStyle = `hsla(${obj.hue}, 100%, ${50 * obj.brightness}%, 0.9)`;
+                this.ctx.shadowColor = `hsla(${obj.hue}, 100%, 50%, 0.5)`;
+            }
+            
+            this.ctx.shadowBlur = 10;
+            
+            if (obj.type === 0) {
+                const radius = obj.body.circleRadius;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                this.ctx.fill();
+            } else if (obj.type === 1) {
+                const width = obj.body.bounds.max.x - obj.body.bounds.min.x;
+                const height = obj.body.bounds.max.y - obj.body.bounds.min.y;
+                this.ctx.fillRect(-width / 2, -height / 2, width, height);
+            } else {
+                this.ctx.beginPath();
+                const vertices = obj.body.vertices;
+                this.ctx.moveTo(
+                    vertices[0].x - obj.body.position.x,
+                    vertices[0].y - obj.body.position.y
+                );
+                for (let i = 1; i < vertices.length; i++) {
+                    this.ctx.lineTo(
+                        vertices[i].x - obj.body.position.x,
+                        vertices[i].y - obj.body.position.y
+                    );
+                }
+                this.ctx.closePath();
+                this.ctx.fill();
+            }
+            
+            this.ctx.restore();
+        });
+        
+        if (this.mouseDown && this.dragStart) {
+            const dx = this.mouseRef.current.x - this.dragStart.x;
+            const dy = this.mouseRef.current.y - this.dragStart.y;
+            
+            this.ctx.strokeStyle = this.isLightMode ? 'rgba(232, 93, 117, 0.8)' : 'rgba(255, 0, 110, 0.8)';
+            this.ctx.lineWidth = 3;
+            this.ctx.setLineDash([10, 5]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.dragStart.x, this.dragStart.y);
+            this.ctx.lineTo(this.mouseRef.current.x, this.mouseRef.current.y);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+        }
+        
+        requestAnimationFrame(() => this.animate());
+    }
+
+    destroy() {
+        this.isActive = false;
+        this.canvas.removeEventListener('mousedown', this.clickHandler);
+        this.canvas.removeEventListener('mouseup', this.mouseUpHandler);
+        this.canvas.removeEventListener('contextmenu', this.contextMenuHandler);
+        window.removeEventListener('keydown', this.keyHandler);
+        window.removeEventListener('resize', this.resizeHandler);
+        Matter.World.clear(this.world);
+        Matter.Engine.clear(this.engine);
+    }
+}
+
+class SynthPad {
+    constructor(canvas, mouseRef, isLightMode) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.mouseRef = mouseRef;
+        this.isLightMode = isLightMode;
+        this.isActive = true;
+        this.synth = null;
+        this.waves = [];
+        this.pads = [];
+        this.cols = 7;
+        this.rows = 5;
+        this.recording = false;
+        this.loop = [];
+        this.loopInterval = null;
+        this.scale = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+        this.octaves = [3, 4, 5, 6, 7];
+        this.resize();
+        this.initAudio();
+        
+        this.clickHandler = (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            for (let pad of this.pads) {
+                if (x >= pad.x && x <= pad.x + pad.width &&
+                    y >= pad.y && y <= pad.y + pad.height) {
+                    this.playNote(pad);
+                    break;
+                }
+            }
+        };
+        
+        this.keyHandler = (e) => {
+            if (e.code === 'KeyR') {
+                e.preventDefault();
+                this.toggleRecording();
+            }
+        };
+        
+        this.canvas.addEventListener('click', this.clickHandler);
+        window.addEventListener('keydown', this.keyHandler);
+        this.resizeHandler = () => this.resize();
+        window.addEventListener('resize', this.resizeHandler);
+    }
+
+    async initAudio() {
+        await Tone.start();
+        this.synth = new Tone.PolySynth(Tone.Synth, {
+            maxPolyphony: 8,
+            oscillator: { type: 'triangle' },
+            envelope: {
+                attack: 0.02,
+                decay: 0.1,
+                sustain: 0.3,
+                release: 1
+            }
+        }).toDestination();
+        
+        this.synth.volume.value = -8;
+    }
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.calculatePads();
+    }
+
+    calculatePads() {
+        this.pads = [];
+        const padding = 10;
+        const padWidth = (this.canvas.width - padding * (this.cols + 1)) / this.cols;
+        const padHeight = (this.canvas.height - padding * (this.rows + 1)) / this.rows;
+        
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                const octave = this.octaves[this.rows - 1 - row];
+                const note = this.scale[col];
+                this.pads.push({
+                    x: padding + col * (padWidth + padding),
+                    y: padding + row * (padHeight + padding),
+                    width: padWidth,
+                    height: padHeight,
+                    note: note + octave,
+                    col: col,
+                    row: row,
+                    active: false,
+                    pulse: 0
+                });
+            }
+        }
+    }
+
+    playNote(pad) {
+        if (this.synth) {
+            this.synth.triggerAttackRelease(pad.note, '8n');
+            pad.active = true;
+            pad.pulse = 1;
+            
+            this.waves.push({
+                x: pad.x + pad.width / 2,
+                y: pad.y + pad.height / 2,
+                radius: 0,
+                maxRadius: 200,
+                life: 60,
+                hue: (pad.col * 51 + pad.row * 20) % 360
+            });
+            
+            if (this.recording) {
+                this.loop.push({
+                    note: pad.note,
+                    time: Date.now()
+                });
+            }
+        }
+    }
+
+    toggleRecording() {
+        this.recording = !this.recording;
+        
+        if (this.recording) {
+            this.loop = [];
+        } else if (this.loop.length > 0) {
+            this.startLoop();
+        }
+    }
+
+    startLoop() {
+        if (this.loopInterval) {
+            clearInterval(this.loopInterval);
+        }
+        
+        const duration = this.loop[this.loop.length - 1].time - this.loop[0].time;
+        let index = 0;
+        
+        this.loopInterval = setInterval(() => {
+            const noteData = this.loop[index];
+            const pad = this.pads.find(p => p.note === noteData.note);
+            if (pad) {
+                this.playNote(pad);
+            }
+            
+            index = (index + 1) % this.loop.length;
+        }, duration / this.loop.length);
+    }
+
+    updateTheme(isLightMode) {
+        this.isLightMode = isLightMode;
+    }
+
+    animate() {
+        if (!this.isActive) return;
+        
+        const bg = this.isLightMode ? 'rgba(253, 251, 247, 0.2)' : 'rgba(10, 10, 10, 0.25)';
+        this.ctx.fillStyle = bg;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.waves = this.waves.filter(wave => {
+            wave.radius += 5;
+            wave.life--;
+            
+            const alpha = wave.life / 60;
+            this.ctx.strokeStyle = this.isLightMode 
+                ? `hsla(${wave.hue}, 70%, 50%, ${alpha * 0.6})`
+                : `hsla(${wave.hue}, 100%, 60%, ${alpha})`;
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            return wave.life > 0 && wave.radius < wave.maxRadius;
+        });
+        
+        this.pads.forEach(pad => {
+            const baseHue = (pad.col * 51 + pad.row * 20) % 360;
+            
+            if (pad.active) {
+                pad.pulse = Math.max(0, pad.pulse - 0.05);
+                if (pad.pulse <= 0) {
+                    pad.active = false;
+                }
+            }
+            
+            const brightness = 0.5 + pad.pulse * 0.5;
+            
+            if (this.isLightMode) {
+                this.ctx.fillStyle = `hsla(${baseHue}, 70%, ${40 + brightness * 30}%, 0.7)`;
+            } else {
+                this.ctx.fillStyle = `hsla(${baseHue}, 100%, ${30 + brightness * 40}%, 0.8)`;
+            }
+            
+            this.ctx.fillRect(pad.x, pad.y, pad.width, pad.height);
+            
+            this.ctx.strokeStyle = this.isLightMode 
+                ? 'rgba(82, 201, 168, 0.3)'
+                : 'rgba(6, 255, 165, 0.4)';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(pad.x, pad.y, pad.width, pad.height);
+        });
+        
+        if (this.recording) {
+            this.ctx.fillStyle = this.isLightMode ? 'rgba(232, 93, 117, 0.8)' : 'rgba(255, 0, 110, 0.9)';
+            this.ctx.beginPath();
+            this.ctx.arc(30, 30, 10, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        requestAnimationFrame(() => this.animate());
+    }
+
+    destroy() {
+        this.isActive = false;
+        if (this.loopInterval) {
+            clearInterval(this.loopInterval);
+        }
+        if (this.synth) {
+            this.synth.dispose();
+        }
+        this.canvas.removeEventListener('click', this.clickHandler);
+        window.removeEventListener('keydown', this.keyHandler);
+        window.removeEventListener('resize', this.resizeHandler);
+    }
+}
+
+class FluidPaint {
+    constructor(canvas, mouseRef, isLightMode) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.mouseRef = mouseRef;
+        this.isLightMode = isLightMode;
+        this.isActive = true;
+        this.particles = [];
+        this.velocityField = [];
+        this.gridSize = 20;
+        this.lastMouse = { x: -1, y: -1 };
+        this.colorOffset = 0;
+        this.resize();
+        this.initVelocityField();
+        
+        this.keyHandler = (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                this.clear();
+            }
+        };
+        
+        window.addEventListener('keydown', this.keyHandler);
+        this.resizeHandler = () => this.resize();
+        window.addEventListener('resize', this.resizeHandler);
+    }
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.initVelocityField();
+    }
+
+    initVelocityField() {
+        this.velocityField = [];
+        const cols = Math.ceil(this.canvas.width / this.gridSize);
+        const rows = Math.ceil(this.canvas.height / this.gridSize);
+        
+        for (let i = 0; i < rows; i++) {
+            this.velocityField[i] = [];
+            for (let j = 0; j < cols; j++) {
+                this.velocityField[i][j] = { vx: 0, vy: 0 };
+            }
+        }
+    }
+
+    clear() {
+        this.particles = [];
+        this.initVelocityField();
+    }
+
+    updateTheme(isLightMode) {
+        this.isLightMode = isLightMode;
+    }
+
+    addFluidForce(x, y, dx, dy) {
+        const strength = 0.3;
+        const radius = 100;
+        
+        const col = Math.floor(x / this.gridSize);
+        const row = Math.floor(y / this.gridSize);
+        
+        for (let i = -3; i <= 3; i++) {
+            for (let j = -3; j <= 3; j++) {
+                const r = row + i;
+                const c = col + j;
+                
+                if (r >= 0 && r < this.velocityField.length && 
+                    c >= 0 && c < this.velocityField[0].length) {
+                    
+                    const cellX = c * this.gridSize;
+                    const cellY = r * this.gridSize;
+                    const dist = Math.sqrt((cellX - x) ** 2 + (cellY - y) ** 2);
+                    
+                    if (dist < radius) {
+                        const force = (1 - dist / radius) * strength;
+                        this.velocityField[r][c].vx += dx * force;
+                        this.velocityField[r][c].vy += dy * force;
+                    }
+                }
+            }
+        }
+        
+        this.colorOffset += Math.abs(dx) + Math.abs(dy);
+        const hue = (this.colorOffset * 2) % 360;
+        
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3 + 1;
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed + dx * 0.5,
+                vy: Math.sin(angle) * speed + dy * 0.5,
+                size: Math.random() * 15 + 5,
+                hue: hue + Math.random() * 60 - 30,
+                life: 200,
+                maxLife: 200
+            });
+        }
+    }
+
+    animate() {
+        if (!this.isActive) return;
+        
+        const bg = this.isLightMode ? 'rgba(253, 251, 247, 0.03)' : 'rgba(10, 10, 10, 0.05)';
+        this.ctx.fillStyle = bg;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        const mx = this.mouseRef.current.x;
+        const my = this.mouseRef.current.y;
+        
+        if (this.lastMouse.x >= 0) {
+            const dx = mx - this.lastMouse.x;
+            const dy = my - this.lastMouse.y;
+            const speed = Math.sqrt(dx * dx + dy * dy);
+            
+            if (speed > 1) {
+                this.addFluidForce(mx, my, dx, dy);
+            }
+        }
+        
+        this.lastMouse = { x: mx, y: my };
+        
+        for (let i = 0; i < this.velocityField.length; i++) {
+            for (let j = 0; j < this.velocityField[0].length; j++) {
+                this.velocityField[i][j].vx *= 0.98;
+                this.velocityField[i][j].vy *= 0.98;
+            }
+        }
+        
+        this.particles = this.particles.filter(p => {
+            const col = Math.floor(p.x / this.gridSize);
+            const row = Math.floor(p.y / this.gridSize);
+            
+            if (row >= 0 && row < this.velocityField.length && 
+                col >= 0 && col < this.velocityField[0].length) {
+                p.vx += this.velocityField[row][col].vx;
+                p.vy += this.velocityField[row][col].vy;
+            }
+            
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.99;
+            p.vy *= 0.99;
+            p.life--;
+            
+            if (p.x < 0 || p.x > this.canvas.width) p.vx *= -0.5;
+            if (p.y < 0 || p.y > this.canvas.height) p.vy *= -0.5;
+            
+            p.x = Math.max(0, Math.min(this.canvas.width, p.x));
+            p.y = Math.max(0, Math.min(this.canvas.height, p.y));
+            
+            const alpha = p.life / p.maxLife;
+            const gradient = this.ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+            
+            if (this.isLightMode) {
+                gradient.addColorStop(0, `hsla(${p.hue}, 75%, 55%, ${alpha * 0.6})`);
+                gradient.addColorStop(1, `hsla(${p.hue}, 75%, 55%, 0)`);
+            } else {
+                gradient.addColorStop(0, `hsla(${p.hue}, 100%, 60%, ${alpha * 0.8})`);
+                gradient.addColorStop(1, `hsla(${p.hue}, 100%, 60%, 0)`);
+            }
+            
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            return p.life > 0;
+        });
+        
+        requestAnimationFrame(() => this.animate());
+    }
+
+    destroy() {
+        this.isActive = false;
+        window.removeEventListener('keydown', this.keyHandler);
+        window.removeEventListener('resize', this.resizeHandler);
+    }
+}
