@@ -1,4 +1,4 @@
-# D:\livon\projects\art_gallery\Dockerfile
+# /home/livon/projects/art_gallery/Dockerfile
 
 FROM python:3.11.9-slim
 
