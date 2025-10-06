@@ -7,25 +7,11 @@ class ParticleWave {
         this.mouseRef = mouseRef;
         this.isLightMode = isLightMode;
         this.particles = [];
-        this.clickOrbs = [];
         this.isActive = true;
         this.time = 0;
         this.resize();
         this.init();
         
-        this.clickHandler = (e) => {
-            const x = e.clientX;
-            const y = e.clientY;
-            this.clickOrbs.push({
-                x, y,
-                life: 60,
-                maxLife: 60,
-                radius: 40,
-                exploded: false
-            });
-        };
-        
-        this.canvas.addEventListener('click', this.clickHandler);
         this.resizeHandler = () => this.resize();
         window.addEventListener('resize', this.resizeHandler);
     }
@@ -64,49 +50,6 @@ class ParticleWave {
         const bg = this.isLightMode ? 'rgba(253, 251, 247, 0.15)' : 'rgba(10, 10, 10, 0.2)';
         this.ctx.fillStyle = bg;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        this.clickOrbs = this.clickOrbs.filter(orb => {
-            orb.life--;
-            
-            if (orb.life <= 0 && !orb.exploded) {
-                orb.exploded = true;
-                
-                this.particles.forEach(p => {
-                    const dx = p.x - orb.x;
-                    const dy = p.y - orb.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (dist < 300) {
-                        const force = (300 - dist) / 300;
-                        const pushForce = 50;
-                        p.vx -= (dx / (dist + 1)) * force * pushForce;
-                        p.vy -= (dy / (dist + 1)) * force * pushForce;
-                    }
-                });
-            }
-            
-            if (!orb.exploded) {
-                const alpha = orb.life / orb.maxLife;
-                const gradient = this.ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.radius);
-                
-                if (this.isLightMode) {
-                    gradient.addColorStop(0, `rgba(232, 93, 117, ${alpha * 0.5})`);
-                    gradient.addColorStop(1, `rgba(232, 93, 117, 0)`);
-                } else {
-                    gradient.addColorStop(0, `rgba(255, 100, 200, ${alpha * 0.8})`);
-                    gradient.addColorStop(1, `rgba(255, 100, 200, 0)`);
-                }
-                
-                this.ctx.fillStyle = gradient;
-                this.ctx.beginPath();
-                this.ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                return true;
-            }
-            
-            return false;
-        });
 
         this.particles.forEach((p, idx) => {
             const dx = this.mouseRef.current.x - p.x;
@@ -148,7 +91,6 @@ class ParticleWave {
 
     destroy() {
         this.isActive = false;
-        this.canvas.removeEventListener('click', this.clickHandler);
         window.removeEventListener('resize', this.resizeHandler);
     }
 }
@@ -1078,6 +1020,14 @@ class PhysicsSandbox {
             { isStatic: true }
         );
         
+        const ceiling = Matter.Bodies.rectangle(
+            this.canvas.width / 2,
+            this.headerHeight - 25,
+            this.canvas.width,
+            50,
+            { isStatic: true }
+        );
+        
         const leftWall = Matter.Bodies.rectangle(
             -25, 
             this.canvas.height / 2, 
@@ -1094,7 +1044,7 @@ class PhysicsSandbox {
             { isStatic: true }
         );
         
-        Matter.World.add(this.world, [ground, leftWall, rightWall]);
+        Matter.World.add(this.world, [ground, ceiling, leftWall, rightWall]);
     }
 
     createBody(x, y, vx, vy) {
